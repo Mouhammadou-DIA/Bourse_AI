@@ -1,0 +1,86 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Actions — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Actions</div>
+    <div class="page-sub">{{ actions.count }} action(s) suivie(s)</div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="chart-card">
+    <div class="card-header">
+      <div class="card-title">Ajouter une action</div>
+    </div>
+    <form method="get" style="padding:16px 20px;display:flex;gap:10px;">
+      {{ form.symbole }}
+      <button type="submit" class="btn btn-primary">Importer</button>
+    </form>
+  </div>
+
+  <div class="table-card">
+    <div class="card-header"><div class="card-title">Toutes les actions</div></div>
+    <table class="ptable">
+      <thead>
+        <tr>
+          <th>Symbole</th>
+          <th>Nom</th>
+          <th>Place</th>
+          <th>Prix live</th>
+          <th>Variation</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in watchlist %}
+        <tr>
+          <td class="sym">{{ item.action.symbole }}</td>
+          <td>{{ item.action.nom|truncatechars:30 }}</td>
+          <td style="color:var(--text3);font-size:11px;font-family:var(--mono)">{{ item.action.place_bourse }}</td>
+          <td class="mono" data-prix-live="{{ item.action.symbole }}">
+            {% if item.prix %}{{ item.prix|floatformat:2 }}{% else %}—{% endif %}
+          </td>
+          <td class="mono {% if item.variation %}{% if item.variation >= 0 %}green{% else %}red{% endif %}{% endif %}"
+              data-var-live="{{ item.action.symbole }}">
+            {% if item.variation is not None %}
+              {% if item.variation >= 0 %}+{% endif %}{{ item.variation|floatformat:2 }}%
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'detail_action' item.action.symbole %}" class="btn btn-outline"
+               style="font-size:11px;padding:4px 10px;">Analyser</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">
+            Aucune action. Saisir un symbole ci-dessus pour commencer.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    // Charger les prix actuels via l'API JSON au chargement
+    try {
+        const resp = await fetch('/api/watchlist/');
+        const data = await resp.json();
+        data.watchlist.forEach(item => {
+            if (!item.prix) return;
+            document.querySelectorAll(`[data-prix-live="${item.symbole}"]`).forEach(el => {
+                el.textContent = parseFloat(item.prix).toFixed(2);
+            });
+        });
+    } catch(e) {
+        console.log('Prix non disponibles pour le moment');
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

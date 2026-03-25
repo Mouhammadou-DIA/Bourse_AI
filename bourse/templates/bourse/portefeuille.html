@@ -1,0 +1,118 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Portefeuille — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">{{ portefeuille.nom }}</div>
+    <div class="page-sub">Solde cash : {{ portefeuille.solde_cash|floatformat:2 }} $</div>
+  </div>
+  <div class="topbar-right">
+    <a href="{% url 'transaction' %}" class="btn btn-primary">+ Transaction</a>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- MÉTRIQUES -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Valeur totale</div>
+      <div class="kpi-value">{{ metriques.valeur_totale|floatformat:2 }} $</div>
+      <span class="kpi-sub">dont {{ portefeuille.solde_cash|floatformat:2 }} $ cash</span>
+    </div>
+    <div class="kpi-card {% if metriques.plus_value_totale >= 0 %}green{% else %}red{% endif %}">
+      <div class="kpi-label">Plus-value</div>
+      <div class="kpi-value">{{ metriques.plus_value_totale|floatformat:2 }} $</div>
+      <span class="kpi-change {% if metriques.rendement_moyen >= 0 %}up{% else %}dn{% endif %}">
+        {{ metriques.rendement_moyen|floatformat:2 }}% moy.
+      </span>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Ratio de Sharpe</div>
+      <div class="kpi-value">{{ metriques.ratio_sharpe|floatformat:3 }}</div>
+      <span class="kpi-sub">Volatilité : {{ metriques.volatilite|floatformat:2 }}%</span>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Positions</div>
+      <div class="kpi-value">{{ metriques.nb_positions }}</div>
+      <span class="kpi-sub">actives</span>
+    </div>
+  </div>
+
+  <!-- POSITIONS -->
+  <div class="table-card">
+    <div class="card-header">
+      <div><div class="card-title">Positions ouvertes</div><div class="card-sub">Prix mis à jour en direct</div></div>
+      <a href="{% url 'transaction' %}" class="btn btn-outline" style="font-size:11px;padding:5px 10px">Nouvelle transaction</a>
+    </div>
+    <table class="ptable">
+      <thead>
+        <tr>
+          <th>Action</th><th>Quantité</th><th>PRU</th>
+          <th>Prix live</th><th>Valeur</th><th>+/- value</th><th>Rend.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pos in positions %}
+        <tr>
+          <td>
+            <a href="{% url 'detail_action' pos.action.symbole %}" class="sym">{{ pos.action.symbole }}</a>
+            <div style="font-size:11px;color:var(--text3)">{{ pos.action.nom|truncatechars:20 }}</div>
+          </td>
+          <td class="mono">{{ pos.quantite_detenue|floatformat:4 }}</td>
+          <td class="mono">{{ pos.prix_moyen_achat|floatformat:2 }}</td>
+          <td class="mono" data-prix-live="{{ pos.action.symbole }}">
+            {{ pos.valeur_actuelle|floatformat:2|default:"—" }}
+          </td>
+          <td class="mono">
+            {% if pos.valeur_actuelle %}{{ pos.valeur_actuelle|floatformat:2 }} ${% else %}—{% endif %}
+          </td>
+          <td class="mono {% if pos.plus_moins_value >= 0 %}green{% else %}red{% endif %}">
+            {% if pos.plus_moins_value %}
+              {% if pos.plus_moins_value >= 0 %}+{% endif %}{{ pos.plus_moins_value|floatformat:2 }} $
+            {% else %}—{% endif %}
+          </td>
+          <td class="mono {% if pos.rendement_pct >= 0 %}green{% else %}red{% endif %}">
+            {% if pos.rendement_pct %}
+              {% if pos.rendement_pct >= 0 %}+{% endif %}{{ pos.rendement_pct|floatformat:2 }}%
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text3)">
+          Aucune position. <a href="{% url 'transaction' %}">Effectuer un achat →</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- HISTORIQUE TRANSACTIONS -->
+  <div class="table-card">
+    <div class="card-header">
+      <div class="card-title">Historique des transactions</div>
+    </div>
+    <table class="ptable">
+      <thead>
+        <tr><th>Date</th><th>Action</th><th>Type</th><th>Quantité</th><th>Prix</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for tx in historique %}
+        <tr>
+          <td style="color:var(--text3);font-size:11px;font-family:var(--mono)">{{ tx.date_transaction|date:"d M Y H:i" }}</td>
+          <td class="sym">{{ tx.action.symbole }}</td>
+          <td><span class="badge {% if tx.type_op == 'ACHAT' %}b-green{% else %}b-red{% endif %}">{{ tx.type_op }}</span></td>
+          <td class="mono">{{ tx.quantite|floatformat:4 }}</td>
+          <td class="mono">{{ tx.prix_unitaire|floatformat:2 }} $</td>
+          <td class="mono">{{ tx.montant_total|floatformat:2 }} $</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">Aucune transaction.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

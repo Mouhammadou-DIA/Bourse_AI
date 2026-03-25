@@ -1,0 +1,224 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Dashboard — BourseAI{% endblock %}
+
+{% block content %}
+<style>
+  /* ─── TICKER TAPE (Bandeau défilant) ─── */
+  .ticker-wrap {
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    box-sizing: border-box;
+    height: 40px;
+    display: flex;
+    align-items: center;
+  }
+
+  .ticker {
+    display: inline-block;
+    animation: ticker-scroll 30s linear infinite;
+  }
+
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--text1);
+    border-right: 1px solid var(--border2);
+  }
+
+  .ticker-item .sym { font-weight: bold; }
+  .ticker-item .var.green { color: #10B981; }
+  .ticker-item .var.red   { color: #EF4444; }
+
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+</style>
+
+<!-- BANDEAU DÉFILANT -->
+<div class="ticker-wrap">
+  <div class="ticker">
+    <!-- On répète deux fois la liste pour assurer la continuité de l'animation -->
+    {% for i in "12" %}
+      {% for item in watchlist %}
+      <div class="ticker-item">
+        <span class="sym">{{ item.action.symbole }}</span>
+        <span>{{ item.prix|default_if_none:"-" }}</span>
+        {% if item.variation is not None %}
+          <span class="var {% if item.variation >= 0 %}green{% else %}red{% endif %}">
+            {% if item.variation >= 0 %}▲{% else %}▼{% endif %} {{ item.variation }}%
+          </span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub" id="clock">Chargement…</div>
+  </div>
+  <div class="topbar-right">
+    <form method="get" action="{% url 'liste_actions' %}" class="search-box">
+      <span class="search-icon">⌕</span>
+      <input name="symbole" placeholder="Rechercher AAPL, TSLA…" class="search-input" autocomplete="off">
+    </form>
+    <a href="{% url 'alertes' %}" class="btn btn-outline">+ Alerte</a>
+    <a href="{% url 'portefeuille' %}" class="btn btn-primary">Portefeuille</a>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Valeur portefeuille</div>
+      <div class="kpi-value">{{ metriques.valeur_totale|default:"—" }} $</div>
+      <span class="kpi-change {% if metriques.rendement_moyen >= 0 %}up{% else %}dn{% endif %}">
+        {% if metriques.rendement_moyen >= 0 %}▲{% else %}▼{% endif %}
+        {{ metriques.rendement_moyen|default:"0" }}%
+      </span>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Plus-value nette</div>
+      <div class="kpi-value">{{ metriques.plus_value_totale|default:"—" }} $</div>
+      <span class="kpi-sub">{{ metriques.nb_positions|default:"0" }} positions</span>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Ratio de Sharpe</div>
+      <div class="kpi-value">{{ metriques.ratio_sharpe|default:"—" }}</div>
+      <span class="kpi-sub">Volatilité : {{ metriques.volatilite|default:"0" }}%</span>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Alertes actives</div>
+      <div class="kpi-value">{{ nb_alertes }}</div>
+      <a href="{% url 'alertes' %}" class="kpi-sub" style="color:var(--text2)">Gérer →</a>
+    </div>
+  </div>
+
+  <!-- WATCHLIST -->
+  <div class="chart-card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Watchlist en direct</div>
+        <div class="card-sub">Prix mis à jour via WebSocket Finnhub</div>
+      </div>
+      <a href="{% url 'liste_actions' %}" class="btn btn-outline" style="font-size:11px;padding:5px 10px">+ Ajouter</a>
+    </div>
+    <table class="ptable">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Prix live</th>
+          <th>Variation</th>
+          <th>RSI</th>
+          <th>Signal</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in watchlist %}
+        <tr>
+          <td>
+            <div class="watch-sym">{{ item.action.symbole }}</div>
+            <div class="watch-name">{{ item.action.nom|truncatechars:28 }}</div>
+          </td>
+          <td class="mono" data-prix-live="{{ item.action.symbole }}">
+            {% if item.prix %}{{ item.prix|floatformat:2 }}{% else %}—{% endif %}
+          </td>
+          <td class="mono {% if item.variation %}{% if item.variation >= 0 %}green{% else %}red{% endif %}{% endif %}"
+              data-var-live="{{ item.action.symbole }}">
+            {% if item.variation is not None %}
+              {% if item.variation >= 0 %}+{% endif %}{{ item.variation|floatformat:2 }}%
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if item.indic and item.indic.rsi_14 %}
+              <span class="badge
+                {% if item.indic.rsi_14 > 70 %}b-red
+                {% elif item.indic.rsi_14 < 30 %}b-green
+                {% else %}b-amber{% endif %}">
+                RSI {{ item.indic.rsi_14|floatformat:1 }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if item.signal == 'achat' %}b-green
+              {% elif item.signal == 'vente' %}b-red
+              {% else %}b-amber{% endif %}">
+              {{ item.signal|default:"—"|title }}
+            </span>
+          </td>
+          <td>
+            <a href="{% url 'detail_action' item.action.symbole %}"
+              class="btn btn-outline" style="font-size:11px;padding:4px 10px">
+              Analyser
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;color:var(--text3);padding:20px">
+            Aucune action suivie.
+            <a href="{% url 'liste_actions' %}">Ajouter une action →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ALERTES RÉCENTES -->
+  {% if alertes_actives %}
+  <div class="chart-card">
+    <div class="card-header">
+      <div class="card-title">Alertes actives</div>
+      <a href="{% url 'alertes' %}" class="btn btn-outline" style="font-size:11px;padding:5px 10px">Tout voir</a>
+    </div>
+    {% for alerte in alertes_actives %}
+    <div class="alerte-item">
+      <div class="alerte-icon {% if 'HAUT' in alerte.type_alerte or alerte.type_alerte == 'MACD' %}alerte-up{% else %}alerte-down{% endif %}">
+        {% if 'HAUT' in alerte.type_alerte or alerte.type_alerte == 'MACD' %}▲{% else %}▼{% endif %}
+      </div>
+      <div class="alerte-body">
+        <div class="alerte-title">{{ alerte.action.symbole }} — {{ alerte.get_type_alerte_display }}
+          {% if alerte.seuil %} ({{ alerte.seuil }} $){% endif %}
+        </div>
+        <div class="alerte-meta">Créée le {{ alerte.date_creation|date:"d M Y" }}
+          {% if alerte.notif_telegram %} · Telegram{% endif %}
+        </div>
+      </div>
+      <span class="badge b-active">Actif</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div><!-- /content -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Horloge
+function majHorloge() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) +
+    ' · ' + now.toLocaleTimeString('fr-FR');
+}
+majHorloge();
+setInterval(majHorloge, 1000);
+</script>
+{% endblock %}

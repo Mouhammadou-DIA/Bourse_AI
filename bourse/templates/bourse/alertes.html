@@ -1,0 +1,137 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Alertes — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Gestion des alertes</div>
+    <div class="page-sub">Celery vérifie toutes les 5 min · Telegram Bot actif</div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-primary" onclick="document.getElementById('form-alerte').scrollIntoView({behavior:'smooth'})">
+      + Nouvelle alerte
+    </button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- STATS -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total alertes</div>
+      <div class="kpi-value">{{ alertes.count }}</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Actives</div>
+      <div class="kpi-value">{{ nb_actives }}</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Déclenchées</div>
+      <div class="kpi-value">{{ nb_declenchees }}</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Telegram</div>
+      <div class="kpi-value">{% if request.user.profile.telegram_actif %}Actif{% else %}Inactif{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- LISTE -->
+    <div class="chart-card">
+      <div class="card-header">
+        <div><div class="card-title">Mes alertes</div><div class="card-sub">Triées par date de création</div></div>
+      </div>
+      {% for alerte in alertes %}
+      <div class="alerte-row" id="alerte-{{ alerte.pk }}">
+        <div class="alerte-type {% if 'HAUT' in alerte.type_alerte or alerte.type_alerte == 'MACD' %}at-up{% else %}at-dn{% endif %}">
+          {% if 'HAUT' in alerte.type_alerte or alerte.type_alerte == 'MACD' %}▲{% else %}▼{% endif %}
+        </div>
+        <div class="alerte-info">
+          <div class="alerte-title">
+            <a href="{% url 'detail_action' alerte.action.symbole %}" style="color:inherit;text-decoration:none">
+              {{ alerte.action.symbole }}
+            </a>
+            — {{ alerte.get_type_alerte_display }}
+            {% if alerte.seuil %} ({{ alerte.seuil|floatformat:2 }} $){% endif %}
+          </div>
+          <div class="alerte-meta">
+            Créée {{ alerte.date_creation|date:"d M Y à H:i" }}
+            {% if alerte.notif_telegram %} · Telegram{% endif %}
+            {% if alerte.notif_email %} · Email{% endif %}
+            {% if alerte.date_declenchement %} · Déclenchée {{ alerte.date_declenchement|date:"d M" }}{% endif %}
+          </div>
+        </div>
+        <span class="badge {% if alerte.active %}b-active{% else %}b-done{% endif %}">
+          {% if alerte.active %}Actif{% else %}Déclenché{% endif %}
+        </span>
+        <div class="row-actions">
+          <form method="post" action="{% url 'toggle_alerte' alerte.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="icon-btn" title="{% if alerte.active %}Désactiver{% else %}Réactiver{% endif %}">
+              {% if alerte.active %}⏸{% else %}▶{% endif %}
+            </button>
+          </form>
+          <form method="post" action="{% url 'suppr_alerte' alerte.pk %}" style="display:inline"
+                onsubmit="return confirm('Supprimer cette alerte ?')">
+            {% csrf_token %}
+            <button type="submit" class="icon-btn" title="Supprimer">✕</button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div style="padding:30px;text-align:center;color:var(--text3)">
+        Aucune alerte créée. Utilisez le formulaire ci-contre.
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- FORMULAIRE -->
+    <div class="chart-card" id="form-alerte">
+      <div class="card-header">
+        <div><div class="card-title">Créer une alerte</div><div class="card-sub">Via Telegram Bot</div></div>
+      </div>
+      <form method="post" action="{% url 'creer_alerte' %}" class="alerte-form">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label">Action</label>
+          {{ form.action }}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            {{ form.type_alerte }}
+          </div>
+          <div class="form-group">
+            <label class="form-label">Seuil (USD)</label>
+            {{ form.seuil }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message personnalisé</label>
+          {{ form.message_perso }}
+        </div>
+        <div style="height:1px;background:var(--border);"></div>
+        <div class="toggle-row"><span>Telegram</span>{{ form.notif_telegram }}</div>
+        <div class="toggle-row"><span>Email</span>{{ form.notif_email }}</div>
+        <div class="toggle-row"><span>Désactiver après envoi</span>{{ form.desactiver_apres }}</div>
+        <div style="height:1px;background:var(--border);"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
+          Créer l'alerte
+        </button>
+        {% if not request.user.profile.telegram_actif %}
+        <div style="text-align:center;font-size:11px;color:var(--amber)">
+          ⚠ Telegram non configuré — <a href="{% url 'lier_telegram' %}">Configurer →</a>
+        </div>
+        {% else %}
+        <div style="text-align:center;font-size:11px;color:var(--text3);font-family:var(--mono)">
+          Chat ID : {{ request.user.profile.telegram_chat_id }} · @BourseAIBot
+        </div>
+        {% endif %}
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

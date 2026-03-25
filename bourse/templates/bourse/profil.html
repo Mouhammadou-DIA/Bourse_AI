@@ -1,0 +1,238 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Mon profil — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Mon profil</div>
+    <div class="page-sub">Gérer vos informations personnelles</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- CARTE PROFIL PRINCIPALE -->
+  <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
+
+    <!-- Colonne gauche — Avatar + Stats -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Avatar -->
+      <div class="chart-card" style="padding:28px;text-align:center;">
+        <div style="width:80px;height:80px;border-radius:50%;
+                    background:linear-gradient(135deg,var(--blue),var(--purple));
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:32px;font-weight:700;color:white;
+                    margin:0 auto 16px;">
+          {{ request.user.username|first|upper }}
+        </div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:4px;">
+          {{ request.user.username }}
+        </div>
+        <div style="font-size:12px;color:var(--text2);font-family:var(--mono);margin-bottom:4px;">
+          {{ request.user.email|default:"Email non renseigné" }}
+        </div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">
+          Membre depuis {{ request.user.date_joined|date:"d M Y" }}
+        </div>
+
+        <!-- Badges -->
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap;">
+          <span class="badge b-blue" style="background:var(--blue-dim);color:var(--blue);">Trader</span>
+          {% if profile.telegram_actif %}
+          <span class="badge" style="background:rgba(37,211,102,0.1);color:#25D366;">Telegram</span>
+          {% endif %}
+          {% if request.user.is_staff %}
+          <span class="badge b-amber">Admin</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Stats rapides -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div class="card-title">Statistiques</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Solde cash</span>
+            <span style="font-family:var(--mono);font-weight:700;color:var(--blue);">
+              {% if pf %}{{ pf.solde_cash|floatformat:2 }} ${% else %}—{% endif %}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Valeur portefeuille</span>
+            <span style="font-family:var(--mono);font-weight:700;color:var(--green);">
+              {{ metriques.valeur_totale|floatformat:2|default:"—" }} $
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Plus-value</span>
+            <span style="font-family:var(--mono);font-weight:700;
+                         color:{% if metriques.plus_value_totale >= 0 %}var(--green){% else %}var(--red){% endif %};">
+              {% if metriques.plus_value_totale is not None %}
+                {% if metriques.plus_value_totale >= 0 %}+{% endif %}
+                {{ metriques.plus_value_totale|floatformat:2 }} $
+              {% else %}—{% endif %}
+            </span>
+          </div>
+          <div style="height:1px;background:var(--border);"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Transactions</span>
+            <span style="font-family:var(--mono);font-weight:700;">{{ nb_transactions }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Alertes actives</span>
+            <span style="font-family:var(--mono);font-weight:700;color:var(--amber);">{{ nb_alertes }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Actions suivies</span>
+            <span style="font-family:var(--mono);font-weight:700;">{{ nb_actions }}</span>
+          </div>
+          {% if metriques.ratio_sharpe %}
+          <div style="height:1px;background:var(--border);"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--text2);">Ratio de Sharpe</span>
+            <span style="font-family:var(--mono);font-weight:700;color:var(--amber);">
+              {{ metriques.ratio_sharpe|floatformat:3 }}
+            </span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Colonne droite — Formulaire édition -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Informations personnelles -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Informations personnelles</div>
+            <div class="card-sub">Modifier vos données de profil</div>
+          </div>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="alerte-form">
+          {% csrf_token %}
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nom d'utilisateur</label>
+              <input type="text" class="form-input" value="{{ request.user.username }}" disabled
+                     style="cursor:not-allowed;opacity:0.6;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Adresse email</label>
+              <input type="email" name="email" class="form-input"
+                     value="{{ request.user.email }}"
+                     placeholder="votre@email.com">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Biographie</label>
+            <textarea name="bio" class="form-input" rows="3"
+                      placeholder="Parlez-nous de votre stratégie d'investissement...">{{ profile.bio|default:'' }}</textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Devise d'affichage</label>
+            <select name="devise_affichage" class="form-input">
+              <option value="USD" {% if profile.devise_affichage == 'USD' %}selected{% endif %}>USD — Dollar américain</option>
+              <option value="EUR" {% if profile.devise_affichage == 'EUR' %}selected{% endif %}>EUR — Euro</option>
+              <option value="XOF" {% if profile.devise_affichage == 'XOF' %}selected{% endif %}>XOF — Franc CFA</option>
+            </select>
+          </div>
+
+          <div style="height:1px;background:var(--border);"></div>
+
+          <button type="submit" class="btn btn-primary"
+                  style="justify-content:center;padding:10px;">
+            Sauvegarder les modifications
+          </button>
+        </form>
+      </div>
+
+      <!-- Sécurité -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Sécurité</div>
+            <div class="card-sub">Changer votre mot de passe</div>
+          </div>
+        </div>
+        <form method="post" action="{% url 'password_change' %}" class="alerte-form">
+          {% csrf_token %}
+          <div class="form-group">
+            <label class="form-label">Mot de passe actuel</label>
+            <input type="password" name="old_password" class="form-input"
+                   placeholder="Mot de passe actuel">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nouveau mot de passe</label>
+              <input type="password" name="new_password1" class="form-input"
+                     placeholder="Nouveau mot de passe">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirmer</label>
+              <input type="password" name="new_password2" class="form-input"
+                     placeholder="Confirmer le mot de passe">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-outline"
+                  style="justify-content:center;padding:10px;">
+            Changer le mot de passe
+          </button>
+        </form>
+      </div>
+
+      <!-- Telegram -->
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Notifications Telegram</div>
+            <div class="card-sub">
+              {% if profile.telegram_actif %}
+                <span style="color:var(--green);">✓ Actif — Chat ID : {{ profile.telegram_chat_id }}</span>
+              {% else %}
+                Non configuré
+              {% endif %}
+            </div>
+          </div>
+          <a href="{% url 'lier_telegram' %}" class="btn btn-outline"
+             style="font-size:11px;padding:6px 12px;">
+            {% if profile.telegram_actif %}Reconfigurer{% else %}Configurer{% endif %}
+          </a>
+        </div>
+        {% if profile.telegram_actif %}
+        <div style="padding:14px 20px;font-size:12px;color:var(--text2);font-family:var(--mono);">
+          Bot : @BourseAIBot · Chat ID : {{ profile.telegram_chat_id }}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Zone danger -->
+      <div class="chart-card" style="border-color:rgba(255,77,109,0.2);">
+        <div class="card-header">
+          <div>
+            <div class="card-title" style="color:var(--red);">Zone danger</div>
+            <div class="card-sub">Actions irréversibles</div>
+          </div>
+        </div>
+        <div style="padding:16px 20px;display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="{% url 'logout' %}"
+             class="btn"
+             style="background:var(--red-dim);color:var(--red);border:1px solid rgba(255,77,109,0.3);">
+            Se déconnecter
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

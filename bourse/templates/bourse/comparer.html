@@ -1,0 +1,154 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Comparer — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Comparer des actions</div>
+    <div class="page-sub">Jusqu'à 4 actions simultanément</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Sélection des actions -->
+  <div class="chart-card">
+    <div class="card-header">
+      <div class="card-title">Choisir les actions à comparer</div>
+    </div>
+    <form method="get" style="padding:16px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      {% for action in toutes_actions %}
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;
+                      padding:6px 12px;border-radius:8px;border:1px solid var(--border2);
+                      background:{% if action.symbole in symboles %}var(--blue-dim){% else %}transparent{% endif %};
+                      color:{% if action.symbole in symboles %}var(--blue){% else %}var(--text2){% endif %};">
+          <input type="checkbox" name="s" value="{{ action.symbole }}"
+                 {% if action.symbole in symboles %}checked{% endif %}
+                 style="accent-color:var(--blue);">
+          {{ action.symbole }}
+        </label>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary">Comparer</button>
+    </form>
+  </div>
+
+  {% if data %}
+  <!-- Graphique de comparaison -->
+  <div class="chart-card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Évolution des prix — base 100</div>
+        <div class="card-sub">Performance relative depuis le début de la période</div>
+      </div>
+      <div class="card-actions" id="periode-btns">
+        <button class="pill active" data-p="1mo">1M</button>
+        <button class="pill" data-p="3mo">3M</button>
+        <button class="pill" data-p="6mo">6M</button>
+        <button class="pill" data-p="1y">1A</button>
+      </div>
+    </div>
+    <div id="chart-comparer" style="height:400px;padding:4px;"></div>
+  </div>
+
+  <!-- Tableau comparatif -->
+  <div class="table-card">
+    <div class="card-header">
+      <div class="card-title">Résumé comparatif</div>
+    </div>
+    <table class="ptable">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Prix actuel</th>
+          <th>Variation (période)</th>
+          <th>Plus haut</th>
+          <th>Plus bas</th>
+          <th>Volatilité</th>
+        </tr>
+      </thead>
+        <tbody>
+        {% for item in data %}
+        <tr>
+            <td>
+            <a href="{% url 'detail_action' item.action.symbole %}" class="sym">
+                {{ item.action.symbole }}
+            </a>
+            <div style="font-size:11px;color:var(--text3)">{{ item.action.nom|truncatechars:25 }}</div>
+            </td>
+            <td class="mono" data-prix-live="{{ item.action.symbole }}">
+            {% if item.close %}{{ item.close|last|floatformat:2 }}{% else %}—{% endif %}
+            </td>
+            <td class="mono {% if item.variation %}{% if item.variation >= 0 %}green{% else %}red{% endif %}{% endif %}">
+            {% if item.variation is not None %}
+                {% if item.variation >= 0 %}+{% endif %}{{ item.variation|floatformat:2 }}%
+            {% else %}—{% endif %}
+            </td>
+            <td class="mono green">
+            {% if item.plus_haut %}{{ item.plus_haut|floatformat:2 }}{% else %}—{% endif %}
+            </td>
+            <td class="mono red">
+            {% if item.plus_bas %}{{ item.plus_bas|floatformat:2 }}{% else %}—{% endif %}
+            </td>
+            <td class="mono amber">
+            {% if item.volatilite %}{{ item.volatilite|floatformat:2 }}%{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="chart-card" style="padding:40px;text-align:center;color:var(--text3);">
+    Sélectionne au moins une action ci-dessus pour commencer la comparaison.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if data %}
+<script>
+const DATA   = {{ data_json|safe }};
+const COLORS = ['#3B82F6','#10D982','#F59E0B','#FF4D6D'];
+const LAYOUT = {
+  paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+  margin:{t:10,r:10,b:40,l:55},
+  font:{family:"'Space Mono',monospace",size:9,color:'#94A3B8'},
+  xaxis:{gridcolor:'rgba(99,120,190,0.08)',tickfont:{size:9},showline:false,zeroline:false},
+  yaxis:{gridcolor:'rgba(99,120,190,0.08)',tickfont:{size:9},showline:false,zeroline:false,
+         title:{text:'Base 100',font:{size:10}}},
+  showlegend:true,
+  legend:{orientation:'h',y:-0.12,font:{size:10}},
+};
+
+function dessiner(n) {
+  const traces = DATA.map((item, i) => {
+    const closes = n ? item.close.slice(-n) : item.close;
+    const dates  = n ? item.dates.slice(-n)  : item.dates;
+    const base   = closes[0] || 1;
+    return {
+      type:  'scatter',
+      mode:  'lines',
+      name:  item.action,
+      x:     dates,
+      y:     closes.map(v => +((v / base) * 100).toFixed(2)),
+      line:  {color: COLORS[i % COLORS.length], width: 2},
+    };
+  });
+  Plotly.react('chart-comparer', traces, LAYOUT, {responsive:true, displayModeBar:false});
+}
+
+dessiner(0);
+
+const PERIODES = {'1mo':30,'3mo':90,'6mo':180,'1y':365};
+document.querySelectorAll('#periode-btns .pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#periode-btns .pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    dessiner(PERIODES[btn.dataset.p] || 0);
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

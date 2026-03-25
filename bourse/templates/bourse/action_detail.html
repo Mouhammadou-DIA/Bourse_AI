@@ -1,0 +1,262 @@
+{% extends 'bourse/base.html' %}
+{% block title %}{{ action.symbole }} — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:20px">
+    <a class="back-btn" href="{% url 'liste_actions' %}">← Retour</a>
+    <div class="stock-header">
+      <div>
+        <div class="stock-sym">{{ action.symbole }}</div>
+        <div class="stock-name">{{ action.nom }} · {{ action.place_bourse }} · {{ action.devise }}</div>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-left:20px">
+        <span class="stock-price" data-prix-live="{{ action.symbole }}" data-prix="{{ prix_actuel }}">
+          {{ prix_actuel|floatformat:2 }}
+        </span>
+        <span class="stock-chg" data-var-live="{{ action.symbole }}">—</span>
+      </div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <a href="{% url 'transaction' %}?action={{ action.symbole }}&type=ACHAT" class="btn btn-green">▲ Acheter</a>
+    <a href="{% url 'transaction' %}?action={{ action.symbole }}&type=VENTE" class="btn btn-red">▼ Vendre</a>
+    <button class="btn btn-outline" onclick="document.getElementById('section-alerte').scrollIntoView({behavior:'smooth'})">+ Alerte</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- GRAPHIQUE PRINCIPAL -->
+  <div class="chart-card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Analyse technique — {{ action.symbole }}</div>
+        <div class="card-sub">Données yfinance · Indicateurs en temps réel</div>
+      </div>
+      <div class="card-actions">
+        <a href="?periode=1h"  class="pill {% if periode == '1h'  %}active{% endif %}">1H</a>
+        <a href="?periode=1d"  class="pill {% if periode == '1d'  %}active{% endif %}">1J</a>
+        <a href="?periode=1w"  class="pill {% if periode == '1w'  %}active{% endif %}">1S</a>
+        <a href="?periode=1mo" class="pill {% if periode == '1mo' %}active{% endif %}">1M</a>
+        <a href="?periode=3mo" class="pill {% if periode == '3mo' %}active{% endif %}">3M</a>
+        <a href="?periode=6mo" class="pill {% if periode == '6mo' %}active{% endif %}">6M</a>
+        <a href="?periode=1y"  class="pill {% if periode == '1y'  %}active{% endif %}">1A</a>
+        <a href="?periode=max" class="pill {% if periode == 'max' %}active{% endif %}">Max</a>
+      </div>
+    </div>
+    <div id="chart-main" style="height:340px;padding:4px;"></div>
+    <div id="chart-macd" style="height:110px;padding:4px;border-top:1px solid var(--border)"></div>
+    <div id="chart-vol"  style="height:80px;padding:4px;border-top:1px solid var(--border)"></div>
+  </div>
+
+  <!-- INDICATEURS -->
+  <div class="four-col">
+    <div class="chart-card">
+      <div class="card-header"><div class="card-title">RSI (14)</div></div>
+      <div class="indic-big">
+        <div class="indic-big-label">Relative Strength Index</div>
+        <div class="indic-big-val {% if indicateurs.rsi_14 %}{% if indicateurs.rsi_14 > 70 %}red{% elif indicateurs.rsi_14 < 30 %}green{% else %}amber{% endif %}{% endif %}">
+          {{ indicateurs.rsi_14|floatformat:1|default:"—" }}
+        </div>
+        <span class="indic-signal {% if indicateurs %}s-{% if indicateurs.rsi_14 > 70 %}red{% elif indicateurs.rsi_14 < 30 %}green{% else %}amber{% endif %}{% endif %}">
+          {{ indicateurs.signal_rsi|default:"—"|title }}
+        </span>
+      </div>
+      <div id="chart-rsi-mini" style="height:80px;padding:4px;"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="card-header"><div class="card-title">MACD</div></div>
+      <div class="indic-big">
+        <div class="indic-big-label">MACD · Signal</div>
+        <div class="indic-big-val {% if indicateurs.macd %}{% if indicateurs.macd > indicateurs.macd_signal %}green{% else %}red{% endif %}{% endif %}">
+          {{ indicateurs.macd|floatformat:3|default:"—" }}
+        </div>
+        <span class="indic-signal {% if indicateurs %}{% if indicateurs.macd > indicateurs.macd_signal %}s-green{% else %}s-red{% endif %}{% endif %}">
+          {{ indicateurs.signal_macd|default:"—"|title }}
+        </span>
+      </div>
+      <div id="chart-macd-mini" style="height:80px;padding:4px;"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="card-header"><div class="card-title">Bandes de Bollinger</div></div>
+      <div class="indic-big">
+        <div class="indic-big-label">Haut · Milieu · Bas</div>
+        <div class="indic-big-val purple">{{ indicateurs.bollinger_mid|floatformat:2|default:"—" }}</div>
+        <span class="indic-signal s-blue">
+          {{ indicateurs.bollinger_bas|floatformat:2|default:"—" }} —
+          {{ indicateurs.bollinger_haut|floatformat:2|default:"—" }}
+        </span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="card-header"><div class="card-title">Moyennes mobiles</div></div>
+      <div class="indic-big">
+        <div class="indic-big-label">SMA 20 · EMA 50</div>
+        <div class="indic-big-val blue">{{ indicateurs.sma_20|floatformat:2|default:"—" }}</div>
+        <span class="indic-signal s-blue">EMA50 : {{ indicateurs.ema_50|floatformat:2|default:"—" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FONDAMENTAUX + ALERTE -->
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="card-header">
+        <div class="card-title">Données fondamentales</div>
+        <div class="card-sub">Source : yfinance</div>
+      </div>
+      <div class="fund-grid">
+        <div class="fund-cell"><div class="fund-label">Capitalisation</div>
+          <div class="fund-val">{% if infos.capitalisation %}{{ infos.capitalisation|floatformat:0 }} ${% else %}—{% endif %}</div></div>
+        <div class="fund-cell"><div class="fund-label">PER (P/E)</div>
+          <div class="fund-val">{{ infos.pe_ratio|default:"—" }}</div></div>
+        <div class="fund-cell"><div class="fund-label">BPA (EPS)</div>
+          <div class="fund-val">{{ infos.eps|default:"—" }} $</div></div>
+        <div class="fund-cell"><div class="fund-label">Dividende</div>
+          <div class="fund-val">{{ infos.dividende|default:"—" }}</div></div>
+        <div class="fund-cell"><div class="fund-label">52 sem. haut</div>
+          <div class="fund-val green">{{ infos.semaine_haut|default:"—" }}</div></div>
+        <div class="fund-cell"><div class="fund-label">52 sem. bas</div>
+          <div class="fund-val red">{{ infos.semaine_bas|default:"—" }}</div></div>
+        <div class="fund-cell"><div class="fund-label">Beta</div>
+          <div class="fund-val">{{ infos.beta|default:"—" }}</div></div>
+        <div class="fund-cell"><div class="fund-label">Signal global</div>
+          <div class="fund-val {% if signal == 'achat' %}green{% elif signal == 'vente' %}red{% else %}amber{% endif %}">
+            {{ signal|title }}
+          </div></div>
+      </div>
+    </div>
+
+    <!-- Formulaire alerte -->
+    <div class="chart-card" id="section-alerte">
+      <div class="card-header">
+        <div class="card-title">Créer une alerte</div>
+        <div class="card-sub">Notification Telegram instantanée</div>
+      </div>
+      <form method="post" action="{% url 'creer_alerte' %}" class="alerte-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="{{ action.pk }}">
+        <div class="form-group">
+          <label class="form-label">Type d'alerte</label>
+          <select name="type_alerte" class="form-input">
+            <option value="PRIX_HAUT">Prix ≥ seuil haut</option>
+            <option value="PRIX_BAS">Prix ≤ seuil bas</option>
+            <option value="RSI_HAUT">RSI > 70 (suracheté)</option>
+            <option value="RSI_BAS">RSI &lt; 30 (survendu)</option>
+            <option value="MACD">Croisement MACD haussier</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Seuil (USD) — optionnel pour RSI/MACD</label>
+          <input type="number" name="seuil" step="0.01" class="form-input"
+                 placeholder="ex: {{ prix_actuel|floatformat:0 }}.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message personnalisé (optionnel)</label>
+          <input type="text" name="message_perso" class="form-input" placeholder="ex: AAPL a franchi 200$">
+        </div>
+        <div class="toggle-row">
+          <span>Telegram</span>
+          <input type="checkbox" name="notif_telegram" checked class="toggle-checkbox">
+        </div>
+        <div class="toggle-row">
+          <span>Email</span>
+          <input type="checkbox" name="notif_email" class="toggle-checkbox">
+        </div>
+        <div class="toggle-row">
+          <span>Désactiver après envoi</span>
+          <input type="checkbox" name="desactiver_apres" checked class="toggle-checkbox">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px">
+          Créer l'alerte
+        </button>
+        {% if not request.user.profile.telegram_actif %}
+        <div style="font-size:11px;color:var(--amber);text-align:center">
+          ⚠ Telegram non lié — <a href="{% url 'lier_telegram' %}">Configurer →</a>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- WebSocket pour ce symbole -->
+<script>
+const OHLCV   = {{ ohlcv_json|safe }};
+const INDICS  = {{ indic_json|safe }};
+const SYMBOLE = '{{ action.symbole }}';
+
+const LAYOUT = {
+  paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+  margin:{t:6,r:10,b:30,l:55},
+  font:{family:"'Space Mono',monospace",size:9,color:'#94A3B8'},
+  xaxis:{gridcolor:'rgba(99,120,190,0.08)',tickfont:{size:8},showline:false,zeroline:false,rangeslider:{visible:false}},
+  yaxis:{gridcolor:'rgba(99,120,190,0.08)',tickfont:{size:8},showline:false,zeroline:false},
+  showlegend:false,
+};
+
+function sliceN(n) {
+  if (!n) return [OHLCV, INDICS];
+  const od = {...OHLCV};
+  const id = {...INDICS};
+  for (const k in od) od[k] = od[k].slice(-n);
+  for (const k in id) id[k] = id[k].slice(-n);
+  return [od, id];
+}
+
+drawCharts();
+
+function drawCharts() {
+  const od = OHLCV;
+  const id = INDICS;
+
+  Plotly.react('chart-main', [
+    {type:'scatter',x:id.dates,y:id.boll_h,mode:'lines',line:{color:'rgba(139,92,246,0.25)',width:1},fill:'tonexty',fillcolor:'rgba(139,92,246,0.03)'},
+    {type:'scatter',x:id.dates,y:id.boll_b,mode:'lines',line:{color:'rgba(139,92,246,0.25)',width:1}},
+    {type:'candlestick',x:od.dates,open:od.open,high:od.high,low:od.low,close:od.close,
+      increasing:{line:{color:'#10D982',width:1},fillcolor:'rgba(16,217,130,0.6)'},
+      decreasing:{line:{color:'#FF4D6D',width:1},fillcolor:'rgba(255,77,109,0.6)'},whiskerwidth:0.6},
+    {type:'scatter',x:id.dates,y:id.sma20,mode:'lines',line:{color:'#3B82F6',width:1.5,dash:'dot'}},
+    {type:'scatter',x:id.dates,y:id.ema50,mode:'lines',line:{color:'#F59E0B',width:1,dash:'dot'}},
+  ], LAYOUT, {responsive:true,displayModeBar:false});
+
+  Plotly.react('chart-macd', [
+    {type:'bar',x:id.dates,y:id.macd_hist,marker:{color:id.macd_hist.map(v=>v>=0?'rgba(16,217,130,0.5)':'rgba(255,77,109,0.5)')}},
+    {type:'scatter',x:id.dates,y:id.macd,mode:'lines',line:{color:'#3B82F6',width:1.5}},
+    {type:'scatter',x:id.dates,y:id.macd_sig,mode:'lines',line:{color:'#F59E0B',width:1,dash:'dash'}},
+  ], {...LAYOUT,margin:{t:0,r:10,b:24,l:55}}, {responsive:true,displayModeBar:false});
+
+  Plotly.react('chart-vol', [
+    {type:'bar',x:od.dates,y:od.volume,
+     marker:{color:od.close.map((c,i)=>i>0&&c>=od.close[i-1]?'rgba(16,217,130,0.4)':'rgba(255,77,109,0.4)')}},
+  ], {...LAYOUT,margin:{t:0,r:10,b:24,l:55},yaxis:{...LAYOUT.yaxis,tickformat:'.2s'}}, {responsive:true,displayModeBar:false});
+
+  Plotly.react('chart-rsi-mini', [
+    {type:'scatter',y:id.rsi,mode:'lines',fill:'tozeroy',fillcolor:'rgba(245,158,11,0.08)',line:{color:'#F59E0B',width:1.5}},
+    {type:'scatter',y:Array(id.rsi.length).fill(70),mode:'lines',line:{color:'rgba(255,77,109,0.3)',width:1,dash:'dash'}},
+    {type:'scatter',y:Array(id.rsi.length).fill(30),mode:'lines',line:{color:'rgba(16,217,130,0.3)',width:1,dash:'dash'}},
+  ], {...LAYOUT,margin:{t:0,r:8,b:20,l:35},yaxis:{...LAYOUT.yaxis,range:[0,100]}}, {responsive:true,displayModeBar:false});
+
+  Plotly.react('chart-macd-mini', [
+    {type:'bar',y:id.macd_hist,marker:{color:id.macd_hist.map(v=>v>=0?'rgba(16,217,130,0.5)':'rgba(255,77,109,0.5)')}},
+  ], {...LAYOUT,margin:{t:0,r:8,b:20,l:35}}, {responsive:true,displayModeBar:false});
+}
+
+//drawCharts();
+
+
+// WebSocket pour ce symbole spécifique
+const priceWS = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/prix/${SYMBOLE}/`);
+priceWS.onmessage = (evt) => {
+  const data = JSON.parse(evt.data);
+  // Le prix et la variation sont mis à jour par le WS global (base.html)
+  // Ici on peut ajouter un point live sur le graphique
+  console.log(`[WS] ${data.symbole} = ${data.prix} (${data.variation > 0 ? '+' : ''}${data.variation}%)`);
+};
+</script>
+{% endblock %}

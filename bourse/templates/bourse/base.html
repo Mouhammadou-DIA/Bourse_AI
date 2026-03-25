@@ -1,0 +1,229 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}BourseAI{% endblock %}</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'bourse/css/style.css' %}">
+  {% block extra_css %}{% endblock %}
+  <style>
+    /* ─── THEME CLAIR (Global) ─── */
+    [data-theme="light"] {
+      --bg:        #F3F4F6; /* Gris très clair pour le fond global */
+      --card-bg:   #FFFFFF; /* Blanc pur pour les cartes */
+      --bg2:       #FFFFFF;
+      --bg3:       #F9FAFB; /* Fond pour les inputs */
+
+      --text1:     #111827; /* Noir doux pour les titres */
+      --text2:     #4B5563; /* Gris foncé pour le texte secondaire */
+      --text3:     #9CA3AF; /* Gris moyen pour les métadonnées */
+
+      --border:    #E5E7EB; /* Bordures douces */
+      --border2:   #F3F4F6;
+
+      --blue:      #2563EB;
+      --blue-dim:  #EFF6FF;
+
+      --green:     #059669; /* Vert un peu plus foncé pour être lisible sur blanc */
+      --green-dim: #D1FAE5;
+
+      --red:       #DC2626; /* Rouge un peu plus foncé */
+      --red-dim:   #FEE2E2;
+
+      --amber:     #D97706;
+    }
+    /* Bouton thème dans la sidebar */
+    .theme-toggle-sidebar {
+      background: transparent;
+      border: 1px solid var(--text3);
+      color: var(--text2);
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s;
+    }
+    .theme-toggle-sidebar:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+      background: var(--blue-dim);
+    }
+  </style>
+  <script>
+    // Appliquer le thème avant même que le body ne soit affiché pour éviter le "flash"
+    (function() {
+      // Priorité : localStorage > Préférence serveur > Défaut 'dark'
+      const localTheme = localStorage.getItem('theme');
+      const userTheme  = "{{ user.profile.theme_pref|default:'dark' }}";
+      document.body.setAttribute('data-theme', localTheme || userTheme);
+    })();
+  </script>
+</head>
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">Bourse<span>AI</span></div>
+    <nav class="nav">
+      <div class="nav-section">Principal</div>
+      <a class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+        <span class="nav-dot"></span> Dashboard
+      </a>
+      <a class="nav-item {% if request.resolver_match.url_name == 'liste_actions' %}active{% endif %}" href="{% url 'liste_actions' %}">
+        <span class="nav-dot"></span> Actions
+      </a>
+      <a class="nav-item {% if request.resolver_match.url_name == 'portefeuille' %}active{% endif %}" href="{% url 'portefeuille' %}">
+        <span class="nav-dot"></span> Portefeuille
+      </a>
+
+      <div class="nav-section">Analyse</div>
+      <a class="nav-item {% if request.resolver_match.url_name == 'comparer' %}active{% endif %}" href="{% url 'comparer' %}">
+        <span class="nav-dot"></span> Comparer
+      </a>
+      <a class="nav-item {% if request.resolver_match.url_name == 'alertes' %}active{% endif %}" href="{% url 'alertes' %}">
+        <span class="nav-dot"></span> Alertes
+        {% if nb_alertes %}<span class="nav-badge">{{ nb_alertes }}</span>{% endif %}
+      </a>
+
+      <div class="nav-section">Compte</div>
+      <a class="nav-item {% if request.resolver_match.url_name == 'profil' %}active{% endif %}" href="{% url 'profil' %}">
+          <span class="nav-dot"></span> Mon profil
+      </a>
+      <a class="nav-item {% if request.resolver_match.url_name == 'lier_telegram' %}active{% endif %}" href="{% url 'lier_telegram' %}">
+        <span class="nav-dot"></span> Telegram
+      </a>
+      <a class="nav-item" href="{% url 'logout' %}">
+        <span class="nav-dot"></span> Déconnexion
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <button id="theme-btn-global" type="button" class="theme-toggle-sidebar" title="Changer de thème">
+        {% if user.profile.theme_pref == 'light' %}🌙 Mode Sombre{% else %}☀ Mode Clair{% endif %}
+      </button>
+
+      <a href="{% url 'profil' %}" style="text-decoration:none;">
+        <div class="user-pill">
+          <div class="user-avatar">{{ request.user.username|first|upper }}</div>
+          <div class="user-info">
+            <div class="user-name">{{ request.user.username }}</div>
+            <div class="user-role">Trader</div>
+          </div>
+        </div>
+      </a>
+      {% if request.user.profile.telegram_actif %}
+      <div class="telegram-badge"><span class="tg-dot"></span> Telegram actif</div>
+      {% endif %}
+      <div class="ws-status" id="ws-global-status">
+        <span class="ws-dot off"></span>
+        <span class="ws-label">Hors ligne</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- Messages Django -->
+    {% if messages %}
+    <div class="messages-wrap">
+      {% for msg in messages %}
+      <div class="msg msg-{{ msg.tags }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+  </main>
+</div><!-- /layout -->
+
+<!-- WebSocket global watchlist -->
+<script>
+const WS_PROTOCOL = location.protocol === 'https:' ? 'wss' : 'ws';
+
+class WatchlistWS {
+  constructor() {
+    this.connect();
+  }
+  connect() {
+    this.ws = new WebSocket(`${WS_PROTOCOL}://${location.host}/ws/watchlist/`);
+    this.ws.onopen = () => {
+      document.getElementById('ws-global-status').querySelector('.ws-dot').className = 'ws-dot on';
+      document.getElementById('ws-global-status').querySelector('.ws-label').textContent = 'Live';
+    };
+    this.ws.onmessage = (evt) => {
+      const data = JSON.parse(evt.data);
+      // Mettre à jour tous les éléments [data-prix-live="SYMBOLE"]
+      document.querySelectorAll(`[data-prix-live="${data.symbole}"]`).forEach(el => {
+        const ancien = parseFloat(el.dataset.prix || el.textContent);
+        el.textContent = parseFloat(data.prix).toFixed(2);
+        el.dataset.prix = data.prix;
+        el.style.color = data.prix >= ancien ? 'var(--green)' : 'var(--red)';
+        setTimeout(() => el.style.color = '', 800);
+      });
+      // Mettre à jour les variations [data-var-live="SYMBOLE"]
+      document.querySelectorAll(`[data-var-live="${data.symbole}"]`).forEach(el => {
+        const v = parseFloat(data.variation || 0);
+        el.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+        el.className = el.className.replace(/\b(green|red)\b/g, '') + (v >= 0 ? ' green' : ' red');
+      });
+    };
+    this.ws.onclose = () => {
+      document.getElementById('ws-global-status').querySelector('.ws-dot').className = 'ws-dot off';
+      document.getElementById('ws-global-status').querySelector('.ws-label').textContent = 'Reconnexion…';
+      setTimeout(() => this.connect(), 3000);
+    };
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { 
+  new WatchlistWS(); 
+
+  // Gestion globale du changement de thème (Sidebar)
+  const themeBtn = document.getElementById('theme-btn-global');
+  if (themeBtn) {
+    // Mettre à jour le texte du bouton au chargement selon le thème actuel
+    const currentTheme = document.body.getAttribute('data-theme');
+    themeBtn.innerHTML = (currentTheme === 'light') ? '🌙 Mode Sombre' : '☀ Mode Clair';
+
+    themeBtn.addEventListener('click', function() {
+      const current = document.body.getAttribute('data-theme');
+      const nextTheme = (current === 'light') ? 'dark' : 'light';
+
+      fetch("{% url 'switch_theme' %}", {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ theme: nextTheme })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Sauvegarder dans le navigateur pour la persistance immédiate
+        localStorage.setItem('theme', data.theme);
+        document.body.setAttribute('data-theme', data.theme);
+        themeBtn.innerHTML = (data.theme === 'light') ? '🌙 Mode Sombre' : '☀ Mode Clair';
+      })
+      .catch(error => console.error('Erreur changement thème:', error));
+    });
+  }
+});
+</script>
+
+<script src="{% static 'bourse/js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

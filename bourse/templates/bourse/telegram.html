@@ -1,0 +1,66 @@
+{% extends 'bourse/base.html' %}
+{% block title %}Telegram — BourseAI{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="page-title">Configuration Telegram</div>
+    <div class="page-sub">Recevoir les alertes sur votre téléphone</div>
+  </div>
+</div>
+
+<div class="content" style="max-width:600px;">
+
+  {% if profile.telegram_actif %}
+  <div style="background:var(--green-dim);border:1px solid rgba(16,217,130,0.3);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:12px;">
+    <span style="font-size:20px;color:var(--green)">✓</span>
+    <div>
+      <div style="font-weight:600;color:var(--green)">Telegram actif</div>
+      <div style="font-size:12px;color:var(--text2);font-family:var(--mono)">Chat ID : {{ profile.telegram_chat_id }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="chart-card">
+    <div class="card-header"><div class="card-title">Étapes de configuration</div></div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-dim);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:13px;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-weight:500;margin-bottom:4px;">Ouvrir Telegram et chercher <span style="font-family:var(--mono);color:var(--blue)">@{{ bot_name }}</span></div>
+          <div style="font-size:12px;color:var(--text2)">Appuyez sur "Démarrer" ou envoyez la commande /start</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-dim);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:13px;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-weight:500;margin-bottom:4px;">Récupérer votre Chat ID</div>
+          <div style="font-size:12px;color:var(--text2)">Le bot vous répondra avec votre Chat ID. Ou visitez <span style="font-family:var(--mono)">t.me/userinfobot</span></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue-dim);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:13px;flex-shrink:0;">3</div>
+        <div>
+          <div style="font-weight:500;margin-bottom:4px;">Entrer votre Chat ID ci-dessous</div>
+          <div style="font-size:12px;color:var(--text2)">Un message de test sera envoyé pour confirmer la liaison</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="card-header"><div class="card-title">Lier votre compte</div></div>
+    <form method="post" class="alerte-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Votre Chat ID Telegram</label>
+        {{ form.chat_id }}
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">
+        Lier et envoyer un message test
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
