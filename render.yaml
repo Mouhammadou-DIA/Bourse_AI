@@ -3,7 +3,7 @@ databases:
     plan: free
     ipAllowList: [] # Accès restreint aux services internes par défaut
 
-redisInstances:
+redis:
   - name: bourse-redis
     plan: free
     ipAllowList: []
