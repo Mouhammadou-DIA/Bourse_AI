@@ -1,15 +1,15 @@
-services:
-  # 1. Base de données PostgreSQL
-  - type: db
-    name: bourse-db
-    ipAllowList: [] # Seuls les services internes y accèdent
+databases:
+  - name: bourse-db
+    plan: free
+    ipAllowList: [] # Accès restreint aux services internes par défaut
 
-  # 2. Redis (Cache + Broker Celery + Channel Layer)
-  - type: redis
-    name: bourse-redis
+redisInstances:
+  - name: bourse-redis
+    plan: free
     ipAllowList: []
 
-  # 3. Web Service (Django + Daphne pour WebSockets)
+services:
+  # 1. Web Service (Django + Daphne pour WebSockets)
   - type: web
     name: bourse-app
     env: python
@@ -31,7 +31,7 @@ services:
       - key: DEBUG
         value: "False"
 
-  # 4. Celery Worker (Traitement des tâches)
+  # 2. Celery Worker (Traitement des tâches)
   - type: worker
     name: bourse-worker
     env: python
@@ -47,7 +47,7 @@ services:
           name: bourse-redis
           property: connectionString
 
-  # 5. Celery Beat (Planificateur de tâches)
+  # 3. Celery Beat (Planificateur de tâches)
   - type: worker
     name: bourse-beat
     env: python
@@ -63,7 +63,7 @@ services:
           name: bourse-redis
           property: connectionString
 
-  # 6. Flux Finnhub (Tâche longue durée)
+  # 4. Flux Finnhub (Tâche longue durée)
   - type: worker
     name: bourse-flux-websocket
     env: python
