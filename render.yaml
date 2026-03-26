@@ -1,12 +1,10 @@
 databases:
   - name: bourse-db
     plan: free
-    ipAllowList: [] # Autorise uniquement les services internes par défaut
 
 redis:
   - name: bourse-redis
     plan: free
-    ipAllowList: [] # Autorise uniquement les services internes par défaut
 
 services:
   # 1. Web Service (Django + Daphne pour WebSockets)
@@ -25,17 +23,22 @@ services:
           name: bourse-redis
           property: connectionString
       - key: PYTHON_VERSION
-        value: 3.10.0 # À ajuster selon votre version
+        value: 3.10.12 # Version plus précise conseillée
       - key: ALLOWED_HOSTS
-        fromContext: shell # Ou mettez votre URL .onrender.com
+        value: bourse-app.onrender.com
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
 
   # 2. Celery Worker (Traitement des tâches)
   - type: worker
     name: bourse-worker
+    plan: starter
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A config worker --loglevel=info"
@@ -52,6 +55,7 @@ services:
   # 3. Celery Beat (Planificateur de tâches)
   - type: worker
     name: bourse-beat
+    plan: starter
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A config beat --loglevel=info"
@@ -68,6 +72,7 @@ services:
   # 4. Flux Finnhub (Tâche longue durée)
   - type: worker
     name: bourse-flux-websocket
+    plan: starter
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python manage.py shell -c \"from bourse.tasks.flux_websocket import demarrer_flux_finnhub; demarrer_flux_finnhub()\""
