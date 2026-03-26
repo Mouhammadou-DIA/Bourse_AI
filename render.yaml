@@ -1,0 +1,80 @@
+services:
+  # 1. Base de données PostgreSQL
+  - type: db
+    name: bourse-db
+    ipAllowList: [] # Seuls les services internes y accèdent
+
+  # 2. Redis (Cache + Broker Celery + Channel Layer)
+  - type: redis
+    name: bourse-redis
+    ipAllowList: []
+
+  # 3. Web Service (Django + Daphne pour WebSockets)
+  - type: web
+    name: bourse-app
+    env: python
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
+    startCommand: "daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: bourse-redis
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.10.0 # À ajuster selon votre version
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+
+  # 4. Celery Worker (Traitement des tâches)
+  - type: worker
+    name: bourse-worker
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A config worker --loglevel=info"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: bourse-redis
+          property: connectionString
+
+  # 5. Celery Beat (Planificateur de tâches)
+  - type: worker
+    name: bourse-beat
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A config beat --loglevel=info"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: bourse-redis
+          property: connectionString
+
+  # 6. Flux Finnhub (Tâche longue durée)
+  - type: worker
+    name: bourse-flux-websocket
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python manage.py shell -c \"from bourse.tasks.flux_websocket import demarrer_flux_finnhub; demarrer_flux_finnhub()\""
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromRedis:
+          name: bourse-redis
+          property: connectionString
