@@ -1,12 +1,12 @@
 databases:
   - name: bourse-db
     plan: free
-    ipAllowList: [] # Accès restreint aux services internes par défaut
+    ipAllowList: [] # Autorise uniquement les services internes par défaut
 
 redis:
   - name: bourse-redis
     plan: free
-    ipAllowList: []
+    ipAllowList: [] # Autorise uniquement les services internes par défaut
 
 services:
   # 1. Web Service (Django + Daphne pour WebSockets)
@@ -26,6 +26,8 @@ services:
           property: connectionString
       - key: PYTHON_VERSION
         value: 3.10.0 # À ajuster selon votre version
+      - key: ALLOWED_HOSTS
+        fromContext: shell # Ou mettez votre URL .onrender.com
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
