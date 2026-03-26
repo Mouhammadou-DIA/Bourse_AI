@@ -11,15 +11,19 @@ services:
   - type: web
     name: bourse-app
     env: python
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
-    startCommand: "daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+    buildCommand: >
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate
+    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: bourse-db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: bourse-redis
           property: connectionString
       - key: PYTHON_VERSION
@@ -40,7 +44,7 @@ services:
     name: bourse-worker
     plan: starter
     env: python
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: pip install -r requirements.txt
     startCommand: "celery -A config worker --loglevel=info"
     envVars:
       - key: DATABASE_URL
@@ -48,16 +52,21 @@ services:
           name: bourse-db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: bourse-redis
           property: connectionString
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
 
   # 3. Celery Beat (Planificateur de tâches)
   - type: worker
     name: bourse-beat
     plan: starter
     env: python
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: pip install -r requirements.txt
     startCommand: "celery -A config beat --loglevel=info"
     envVars:
       - key: DATABASE_URL
@@ -65,23 +74,33 @@ services:
           name: bourse-db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: bourse-redis
           property: connectionString
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
 
   # 4. Flux Finnhub (Tâche longue durée)
   - type: worker
     name: bourse-flux-websocket
     plan: starter
     env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python manage.py shell -c \"from bourse.tasks.flux_websocket import demarrer_flux_finnhub; demarrer_flux_finnhub()\""
+    buildCommand: pip install -r requirements.txt
+    startCommand: "python manage.py flux"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: bourse-db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: redis
           name: bourse-redis
           property: connectionString
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
