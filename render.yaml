@@ -2,10 +2,6 @@ databases:
   - name: bourse-db
     plan: free
 
-redis:
-  - name: bourse-redis
-    plan: free
-
 envVarGroups:
   - name: bourse-shared-env
     envVars:
@@ -16,7 +12,8 @@ envVarGroups:
           name: bourse-db
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
+          type: keyvalue
           name: bourse-redis
           property: connectionString
       - key: PYTHON_VERSION
@@ -35,6 +32,11 @@ envVarGroups:
         value: https://bourse-app.onrender.com
 
 services:
+  # 0. Key Value (Redis/Valkey)
+  - type: keyvalue
+    name: bourse-redis
+    plan: free
+
   # 1. Web Service (Django + Daphne pour WebSockets)
   - type: web
     name: bourse-app
