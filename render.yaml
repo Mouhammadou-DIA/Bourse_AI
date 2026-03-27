@@ -32,69 +32,12 @@ services:
   # 1. Web Service (Django + Daphne pour WebSockets)
   - type: web
     name: bourse-app
-    plan: starter
+    plan: free
     env: python
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
     preDeployCommand: "python manage.py migrate"
     startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
     healthCheckPath: /
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bourse-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: bourse-redis
-          property: connectionString
-      - fromGroup: bourse-shared-env
-
-  # 2. Celery Worker (Traitement des tâches)
-  - type: worker
-    name: bourse-worker
-    plan: starter
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery -A config worker --loglevel=info"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bourse-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: bourse-redis
-          property: connectionString
-      - fromGroup: bourse-shared-env
-
-  # 3. Celery Beat (Planificateur de tâches)
-  - type: worker
-    name: bourse-beat
-    plan: starter
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery -A config beat --loglevel=info"
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bourse-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: bourse-redis
-          property: connectionString
-      - fromGroup: bourse-shared-env
-
-  # 4. Flux Finnhub (Tâche longue durée)
-  - type: worker
-    name: bourse-flux-websocket
-    plan: starter
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "celery -A config worker --loglevel=info -Q finnhub_flux" # Worker dédié pour les tâches du flux Finnhub
     envVars:
       - key: DATABASE_URL
         fromDatabase:
