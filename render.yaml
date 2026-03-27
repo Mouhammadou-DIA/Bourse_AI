@@ -7,15 +7,6 @@ envVarGroups:
     envVars:
       - key: SECRET_KEY
         sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: bourse-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: bourse-redis
-          property: connectionString
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: DEBUG
@@ -36,6 +27,7 @@ services:
   - type: keyvalue
     name: bourse-redis
     plan: free
+    ipAllowList: []
 
   # 1. Web Service (Django + Daphne pour WebSockets)
   - type: web
@@ -47,6 +39,15 @@ services:
     startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
     healthCheckPath: /
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: bourse-redis
+          property: connectionString
       - fromGroup: bourse-shared-env
 
   # 2. Celery Worker (Traitement des tâches)
@@ -57,6 +58,15 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A config worker --loglevel=info"
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: bourse-redis
+          property: connectionString
       - fromGroup: bourse-shared-env
 
   # 3. Celery Beat (Planificateur de tâches)
@@ -67,6 +77,15 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A config beat --loglevel=info"
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: bourse-redis
+          property: connectionString
       - fromGroup: bourse-shared-env
 
   # 4. Flux Finnhub (Tâche longue durée)
@@ -77,4 +96,13 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "celery -A config worker --loglevel=info -Q finnhub_flux" # Worker dédié pour les tâches du flux Finnhub
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bourse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: bourse-redis
+          property: connectionString
       - fromGroup: bourse-shared-env
