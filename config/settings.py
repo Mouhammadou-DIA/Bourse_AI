@@ -9,7 +9,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', '')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,bourse-app.onrender.com').split(',')
+ALLOWED_HOSTS = [
+    host.strip() for host in os.getenv(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,bourse-app.onrender.com'
+    ).split(',') if host.strip()
+]
 # On force l'ajout des domaines ngrok (même si le .env dit le contraire)
 ALLOWED_HOSTS.extend(['.ngrok-free.app', '.ngrok-free.dev'])
 
@@ -38,6 +43,17 @@ MIDDLEWARE = [
 # Pour ngrok, il faut aussi autoriser l'origine sécurisée pour les requêtes POST (ex: login)
 if DEBUG:
     CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app', 'https://*.ngrok-free.dev']
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip() for origin in os.getenv(
+            'CSRF_TRUSTED_ORIGINS',
+            'https://bourse-app.onrender.com'
+        ).split(',') if origin.strip()
+    ]
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 ROOT_URLCONF = 'config.urls'

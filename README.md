@@ -161,6 +161,25 @@ Cela lance automatiquement : PostgreSQL, Redis, Django (daphne), Celery worker, 
 
 ---
 
+## Deploiement Render (Blueprint)
+
+Le projet inclut un fichier `render.yaml` pret a l'emploi:
+
+- 1 service web `bourse-app` (Django + Daphne)
+- 3 workers (`bourse-worker`, `bourse-beat`, `bourse-flux-websocket`)
+- 1 base PostgreSQL Render
+- 1 instance Redis Render
+
+### Variables importantes a definir dans Render
+
+- `SECRET_KEY` (obligatoire, partagee par web + workers)
+- `FINNHUB_API_KEY` (obligatoire pour le flux temps reel)
+- `TELEGRAM_BOT_TOKEN` (optionnel)
+
+`ALLOWED_HOSTS` et `CSRF_TRUSTED_ORIGINS` sont deja preconfigures pour `bourse-app.onrender.com`. Si vous changez de domaine, mettez-les a jour dans `render.yaml` ou directement dans le dashboard Render.
+
+---
+
 ## Lancer les tests
 
 ```bash
